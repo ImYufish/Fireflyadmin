@@ -1,0 +1,583 @@
+---
+import FontSetup from "@components/features/FontSetup.astro";
+/**
+ * 后台管理通用布局（现代化设计）：
+ * - 左侧栏：品牌、图标导航（可折叠）、站点资料卡
+ * - 顶部栏：页面标题、主题切换、用户头像与退出
+ * - 主题完全跟随博客变量（siteConfig 改主题色/明暗模式，后台即时跟随）
+ * - 内置无刷新导航（对齐博客 swup 体感）
+ * 使用方需在页面 frontmatter 完成会话校验并传入 session。
+ */
+import { Icon } from "astro-icon/components";
+import { siteConfig } from "@/config";
+import ThemeInit from "../components/ThemeInit.astro";
+import type { ResolvedSession } from "../lib/auth";
+import "../../styles/variables.styl";
+import "../styles/admin.css";
+
+interface Props {
+	title: string;
+	active: "dashboard" | "posts" | "editor" | "config" | "images";
+	session: ResolvedSession;
+}
+
+const { title, active, session } = Astro.props;
+
+const navSections = [
+	{
+		label: "内容",
+		items: [
+			{
+				key: "dashboard",
+				href: "/admin/",
+				label: "仪表盘",
+				icon: "material-symbols:dashboard-outline",
+			},
+			{
+				key: "posts",
+				href: "/admin/posts/",
+				label: "文章管理",
+				icon: "material-symbols:article-outline",
+			},
+			{
+				key: "images",
+				href: "/admin/images/",
+				label: "图片管理",
+				icon: "material-symbols:image-outline",
+			},
+			{
+				key: "editor",
+				href: "/admin/editor/",
+				label: "文件编辑器",
+				icon: "material-symbols:edit-note",
+			},
+		],
+	},
+	{
+		label: "站点",
+		items: [
+			{
+				key: "config",
+				href: "/admin/config/",
+				label: "网站配置",
+				icon: "material-symbols:settings-outline",
+			},
+		],
+	},
+] as const;
+
+const siteUrl = siteConfig.site_url.replace(/^https?:\/\//, "");
+---
+
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>{title} · Firefly 后台</title>
+		<script is:inline>
+			/* 拦截 Vite 的 full-reload：编辑器保存内容文件后 dev 服务器会广播
+			   整页刷新，导致后台正在输入的页面被刷回顶部。后台页面改为保持
+			   现状（iframe 里的博客预览不受影响，它自己会收到刷新）。
+			   仅后台布局加载此脚本，博客前台不受影响。*/
+			(function () {
+				const NativeWS = window.WebSocket;
+				if (!NativeWS) return;
+				function PatchedWS(url, protocols) {
+					const ws =
+						protocols !== undefined
+							? new NativeWS(url, protocols)
+							: new NativeWS(url);
+					const filter = function (event) {
+						try {
+							const msg = JSON.parse(event.data);
+							if (msg && msg.type === "full-reload") return null;
+						} catch {}
+						return event;
+					};
+					const origAdd = ws.addEventListener.bind(ws);
+					ws.addEventListener = function (type, listener, opts) {
+						if (type === "message") {
+							return origAdd(type, function (event) {
+								const filtered = filter(event);
+								if (filtered) return listener.call(ws, filtered);
+							}, opts);
+						}
+						return origAdd(type, listener, opts);
+					};
+					let onmsg = null;
+					Object.defineProperty(ws, "onmessage", {
+						set(fn) {
+							onmsg = fn
+								? function (event) {
+										const filtered = filter(event);
+										if (filtered) return onmsg.call(ws, filtered);
+									}
+								: null;
+							if (onmsg) origAdd("message", onmsg);
+						},
+						get() {
+							return onmsg;
+						},
+					});
+					return ws;
+				}
+				PatchedWS.prototype = NativeWS.prototype;
+				Object.setPrototypeOf(PatchedWS, NativeWS);
+				window.WebSocket = PatchedWS;
+			})();
+		</script>
+		<ThemeInit />
+		<FontSetup />
+	</head>
+	<body class="flex h-screen overflow-hidden" data-no-swup>
+		<!-- 窄屏抽屉遮罩（桌面端 display:none） -->
+		<div class="admin-sidebar-backdrop" data-admin-sidebar-backdrop></div>
+
+		<!-- 侧边栏 -->
+		<aside
+			id="admin-sidebar"
+			class="admin-sidebar flex shrink-0 flex-col overflow-hidden border-r border-(--admin-line) bg-(--admin-panel) transition-[width] duration-200"
+		>
+			<div class="flex items-center gap-2.5 px-5 pt-5 pb-5">
+				<div
+					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--admin-accent) text-(--page-bg)"
+				>
+					<Icon name="material-symbols:bolt" class="text-xl" />
+				</div>
+				<div class="sidebar-label min-w-0">
+					<div class="truncate text-sm font-bold text-(--admin-text-strong)">
+						Firefly 后台
+					</div>
+					<div class="truncate text-[11px] text-(--admin-text-faint)">
+						管理面板 · /admin
+					</div>
+				</div>
+			</div>
+
+			<nav class="flex-1 space-y-4 overflow-y-auto px-3 py-2">
+				{
+					navSections.map((section) => (
+						<div>
+							<div class="sidebar-label px-3 pt-1 pb-1.5 text-[10px] font-semibold tracking-widest text-(--admin-text-faint) uppercase">
+								{section.label}
+							</div>
+							<div class="space-y-1">
+								{section.items.map((item) => (
+									<a
+										href={item.href}
+										data-admin-nav
+										class:list={[
+											"admin-nav-item flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+											active === item.key ? "is-active" : "text-(--admin-text) hover:bg-(--admin-panel-hover) hover:text-(--admin-text-strong)",
+										]}
+										title={item.label}
+									>
+										<Icon name={item.icon} class="shrink-0 text-lg" />
+										<span class="sidebar-label min-w-0 truncate">{item.label}</span>
+									</a>
+								))}
+							</div>
+						</div>
+					))
+				}
+			</nav>
+
+			<!-- 站点资料卡 -->
+			<div class="px-3 pb-2">
+				<div
+					class="sidebar-profile rounded-2xl border border-(--admin-line) bg-(--admin-bg) p-4 text-center"
+				>
+					<a
+						href="/"
+						target="_blank"
+						title="前往站点"
+						class="sidebar-profile-avatar mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-(--admin-soft) text-lg font-bold text-(--admin-text-strong)"
+					>
+						{
+							session.avatar ? (
+								<img
+									src={session.avatar}
+									alt={session.login}
+									class="h-full w-full object-cover"
+								/>
+							) : (
+								session.login.slice(0, 2).toUpperCase()
+							)
+						}
+					</a>
+					<div class="sidebar-label truncate text-sm font-semibold text-(--admin-text-strong)">
+						{session.name}
+					</div>
+					<div class="sidebar-label truncate text-[11px] text-(--admin-text-faint)">
+						{siteUrl}
+					</div>
+					<a
+						href="/"
+						target="_blank"
+						class="sidebar-profile-link sidebar-label mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-(--admin-accent-soft) px-3 py-1.5 text-xs font-medium text-(--admin-accent-hover) transition-colors hover:bg-(--admin-accent)/20"
+					>
+						<Icon name="material-symbols:open-in-new" class="text-sm" />
+						前往站点
+					</a>
+				</div>
+			</div>
+
+			<div class="space-y-1 border-t border-(--admin-divider) px-3 py-3">
+				<button
+					id="admin-theme-toggle"
+					type="button"
+					class="admin-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-(--admin-text) transition-colors hover:bg-(--admin-panel-hover) hover:text-(--admin-text-strong)"
+					title="切换明暗主题（与博客同步）"
+				>
+					<span id="admin-icon-dark" class="hidden">
+						<Icon name="material-symbols:dark-mode-outline" class="shrink-0 text-lg" />
+					</span>
+					<span id="admin-icon-light" class="hidden">
+						<Icon name="material-symbols:light-mode-outline" class="shrink-0 text-lg" />
+					</span>
+					<span class="sidebar-label">切换主题</span>
+				</button>
+				<button
+					id="admin-sidebar-toggle"
+					type="button"
+					class="admin-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-(--admin-text) transition-colors hover:bg-(--admin-panel-hover) hover:text-(--admin-text-strong)"
+					title="收起 / 展开菜单"
+				>
+					<Icon
+						name="material-symbols:chevron-left-rounded"
+						class="sidebar-collapse-icon shrink-0 text-lg transition-transform duration-200"
+					/>
+					<span class="sidebar-label">收起菜单</span>
+				</button>
+				<button
+					id="admin-logout-btn"
+					type="button"
+					class="admin-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-(--admin-text) transition-colors hover:bg-(--admin-panel-hover) hover:text-admin-danger"
+					title="退出登录"
+				>
+					<Icon name="material-symbols:logout" class="shrink-0 text-lg" />
+					<span class="sidebar-label">退出登录</span>
+				</button>
+			</div>
+		</aside>
+
+		<!-- 右侧：顶栏 + 主内容 -->
+		<div class="flex min-w-0 flex-1 flex-col">
+			<header
+				class="flex h-14 shrink-0 items-center gap-3 border-b border-(--admin-line) bg-(--admin-panel) px-5"
+			>
+				<button
+					id="admin-sidebar-open"
+					type="button"
+					class="rounded-lg p-2 text-(--admin-text) transition-colors hover:bg-(--admin-panel-hover) hover:text-(--admin-text-strong) md:hidden"
+					title="打开菜单"
+					aria-label="打开菜单"
+				>
+					<Icon name="material-symbols:menu-rounded" class="text-lg" />
+				</button>
+				<h1 class="min-w-0 flex-1 truncate text-base font-semibold text-(--admin-text-strong)">
+					{title}
+				</h1>
+				<a
+					href="/"
+					target="_blank"
+					class="rounded-lg p-2 text-(--admin-text-faint) transition-colors hover:bg-(--admin-panel-hover) hover:text-(--admin-text-strong)"
+					title="访问博客前台"
+				>
+					<Icon name="material-symbols:language" class="text-lg" />
+				</a>
+				<div
+					class="flex items-center gap-2 rounded-full border border-(--admin-line) py-1 pl-1 pr-3"
+				>
+					{
+						session.avatar ? (
+							<img
+								src={session.avatar}
+								alt={session.login}
+								class="h-7 w-7 rounded-full"
+							/>
+						) : (
+							<div class="flex h-7 w-7 items-center justify-center rounded-full bg-(--admin-soft) text-[10px] font-bold">
+								{session.login.slice(0, 2).toUpperCase()}
+							</div>
+						)
+					}
+					<div class="hidden leading-tight sm:block">
+						<div class="text-xs font-medium text-(--admin-text-strong)">
+							{session.name}
+						</div>
+						<div class="text-[10px] text-(--admin-text-faint)">管理员</div>
+					</div>
+				</div>
+			</header>
+
+			<main id="admin-main" class="min-w-0 flex-1 overflow-auto">
+				<slot />
+			</main>
+		</div>
+
+		<script>
+			/* ---------------- 主题切换：与博客使用同一 localStorage 键 ---------------- */
+			function syncThemeIcons() {
+				const isDark = document.documentElement.classList.contains("dark");
+				const darkIcon = document.getElementById("admin-icon-dark");
+				const lightIcon = document.getElementById("admin-icon-light");
+				// 两个 span 都带 Tailwind 的 hidden 类，style.display = "" 只是清掉内联样式，
+				// 会回退到类上的 display:none —— 图标永远不显示。必须显式给 inline-flex 覆盖。
+				if (darkIcon) darkIcon.style.display = isDark ? "inline-flex" : "none";
+				if (lightIcon) lightIcon.style.display = isDark ? "none" : "inline-flex";
+			}
+			syncThemeIcons();
+			document
+				.getElementById("admin-theme-toggle")
+				?.addEventListener("click", () => {
+					const isDark = document.documentElement.classList.contains("dark");
+					const next = isDark ? "light" : "dark";
+					localStorage.setItem("theme", next);
+					document.documentElement.classList.toggle("dark", next === "dark");
+					syncThemeIcons();
+				});
+			// 博客前台（其它标签页）切换主题时同步按钮图标
+			window.addEventListener("storage", (e) => {
+				if (e.key === "theme") syncThemeIcons();
+			});
+
+			/* ---------------- 侧边栏折叠 + 窄屏抽屉 ---------------- */
+			const SIDEBAR_KEY = "firefly-admin-sidebar-collapsed";
+			const sidebar = document.getElementById("admin-sidebar");
+			const collapseIcon = document.querySelector(".sidebar-collapse-icon");
+			const isNarrow = () => window.matchMedia("(max-width: 767px)").matches;
+
+			function setSidebarLabels(show: boolean) {
+				document
+					.querySelectorAll<HTMLElement>(".sidebar-label")
+					.forEach((el) => (el.style.display = show ? "" : "none"));
+			}
+
+			function applySidebar() {
+				if (!sidebar) return;
+				// 窄屏走抽屉模式：宽度由 CSS 固定，忽略桌面端的折叠偏好
+				if (isNarrow()) {
+					sidebar.classList.remove("collapsed", "w-16", "w-60");
+					setSidebarLabels(true);
+					sidebar
+						.querySelectorAll<HTMLElement>(".admin-nav-item")
+						.forEach((el) => el.classList.remove("justify-center"));
+					sidebar
+						.querySelector("div")
+						?.classList.remove("justify-center");
+					collapseIcon?.classList.remove("rotate-180");
+					return;
+				}
+				const collapsed = localStorage.getItem(SIDEBAR_KEY) === "1";
+				sidebar.classList.toggle("w-16", collapsed);
+				sidebar.classList.toggle("w-60", !collapsed);
+				// 折叠态样式（资料卡精简等）由 .collapsed 驱动
+				sidebar.classList.toggle("collapsed", collapsed);
+				setSidebarLabels(!collapsed);
+				sidebar
+					.querySelectorAll<HTMLElement>(".admin-nav-item")
+					.forEach((el) => el.classList.toggle("justify-center", collapsed));
+				const brand = sidebar.querySelector("div");
+				if (brand) brand.classList.toggle("justify-center", collapsed);
+				collapseIcon?.classList.toggle("rotate-180", collapsed);
+			}
+
+			/* 抽屉开关（仅窄屏生效） */
+			function setDrawer(open: boolean) {
+				sidebar?.classList.toggle("is-open", open);
+				document.body.classList.toggle("admin-sidebar-open", open);
+			}
+
+			applySidebar();
+			setDrawer(false);
+
+			document
+				.getElementById("admin-sidebar-open")
+				?.addEventListener("click", () => setDrawer(true));
+			document
+				.querySelector("[data-admin-sidebar-backdrop]")
+				?.addEventListener("click", () => setDrawer(false));
+			// 抽屉里点击导航后自动收起，避免遮挡内容
+			sidebar?.addEventListener("click", (event) => {
+				if (!isNarrow()) return;
+				if ((event.target as HTMLElement)?.closest("[data-admin-nav]"))
+					setDrawer(false);
+			});
+			window.addEventListener("keydown", (event) => {
+				if (event.key === "Escape") setDrawer(false);
+			});
+			// 视口跨断点时重新套用布局，并清掉抽屉状态
+			let lastNarrow = isNarrow();
+			window.addEventListener("resize", () => {
+				const narrow = isNarrow();
+				if (narrow !== lastNarrow) {
+					lastNarrow = narrow;
+					setDrawer(false);
+					applySidebar();
+				}
+			});
+
+			document
+				.getElementById("admin-sidebar-toggle")
+				?.addEventListener("click", () => {
+					localStorage.setItem(
+						SIDEBAR_KEY,
+						localStorage.getItem(SIDEBAR_KEY) === "1" ? "0" : "1",
+					);
+					applySidebar();
+				});
+
+			/* ---------------- 退出登录 ---------------- */
+			document
+				.getElementById("admin-logout-btn")
+				?.addEventListener("click", async function (this: HTMLButtonElement) {
+					this.setAttribute("disabled", "true");
+					try {
+						await fetch("/api/admin/auth/logout/", { method: "POST" });
+					} finally {
+						window.location.href = "/admin/login/";
+					}
+				});
+
+			/* ---------------- 无刷新导航（对齐博客 swup 的体感） ---------------- */
+			function markActive() {
+				const path = window.location.pathname;
+				document
+					.querySelectorAll<HTMLAnchorElement>("[data-admin-nav]")
+					.forEach((a) => {
+						const target = new URL(a.href).pathname;
+						const isActive =
+							target === "/admin/" ? path === "/admin/" : path.startsWith(target);
+						a.classList.toggle("is-active", isActive);
+					});
+			}
+
+			function mergeHeadAssets(doc: Document) {
+				// 页面级资源随导航补进 head：CSS、预加载、以及新页面 island 水合所需的
+				// 样式标签与模块脚本。注意：DOM 插入的 <script> 不会自动执行，需重建。
+				const head = document.head;
+				const nodes = doc.head.querySelectorAll(
+					'link[rel="stylesheet"], link[rel="modulepreload"], link[rel="preload"][href*=".css"]',
+				);
+				for (const node of nodes) {
+					const href = node.getAttribute("href");
+					if (href && !head.querySelector(`link[href="${href}"]`)) {
+						head.appendChild(node.cloneNode(true));
+					}
+				}
+				for (const style of doc.head.querySelectorAll("style[data-vite-dev-id]")) {
+					const id = style.getAttribute("data-vite-dev-id");
+					if (
+						id &&
+						!head.querySelector(`style[data-vite-dev-id="${CSS.escape(id)}"]`)
+					) {
+						head.appendChild(style.cloneNode(true));
+					}
+				}
+				for (const script of doc.head.querySelectorAll('script[type="module"]')) {
+					const src = script.getAttribute("src");
+					if (src) {
+						if (!head.querySelector(`script[src="${src}"]`)) {
+							const s = document.createElement("script");
+							s.type = "module";
+							s.src = src;
+							head.appendChild(s);
+						}
+					} else if (script.textContent?.trim()) {
+						const text = script.textContent;
+						let duplicated = false;
+						for (const existing of head.querySelectorAll(
+							'script[type="module"]:not([src])',
+						)) {
+							if (existing.textContent === text) {
+								duplicated = true;
+								break;
+							}
+						}
+						if (!duplicated) {
+							const s = document.createElement("script");
+							s.type = "module";
+							s.textContent = text;
+							head.appendChild(s);
+						}
+					}
+				}
+			}
+
+			let navToken = 0;
+
+			async function adminNavigate(url: string, push = true) {
+				// 编辑器有未保存内容时先确认
+				const workspace = window as Window & { __adminUnsaved?: boolean };
+				if (
+					workspace.__adminUnsaved &&
+					!window.confirm("有未保存的更改，确定离开吗？")
+				) {
+					if (!push) history.pushState({}, "", url);
+					return;
+				}
+				const token = ++navToken;
+				try {
+					const res = await fetch(url, { headers: { "x-admin-nav": "1" } });
+					const html = await res.text();
+					const doc = new DOMParser().parseFromString(html, "text/html");
+					const nextMain = doc.getElementById("admin-main");
+					const container = document.getElementById("admin-main");
+					if (!res.ok || !nextMain || !container) throw new Error("bad page");
+					mergeHeadAssets(doc);
+					container.classList.add("admin-nav-out");
+					await new Promise((r) => setTimeout(r, 150));
+					if (token !== navToken) return; // 已有更新的导航，丢弃本次结果
+					container.replaceChildren(...nextMain.childNodes);
+					// 重新创建换入内容里的所有脚本（island 水合脚本等）：
+					// DOM 插入的 <script> 不会自动执行，必须重建元素才会运行
+					for (const script of container.querySelectorAll("script")) {
+						const s = document.createElement("script");
+						for (const attr of script.attributes)
+							s.setAttribute(attr.name, attr.value);
+						s.textContent = script.textContent ?? "";
+						script.replaceWith(s);
+					}
+					container.classList.remove("admin-nav-out");
+					container.classList.add("admin-nav-in");
+					setTimeout(() => container.classList.remove("admin-nav-in"), 300);
+					document.title = doc.title;
+					if (push) history.pushState({}, "", url);
+					markActive();
+					container.scrollTop = 0;
+				} catch {
+					window.location.href = url; // 兜底：整页跳转
+				}
+			}
+
+			document.addEventListener("click", (event) => {
+				if (event.defaultPrevented || event.button !== 0) return;
+				if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+					return;
+				const anchor = (event.target as HTMLElement | null)?.closest("a");
+				if (!anchor || anchor.dataset.adminNoNav !== undefined) return;
+				if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+				const url = new URL(anchor.href, window.location.href);
+				if (url.origin !== window.location.origin) return;
+				// 仅拦截后台页面链接；/api/ 与前台路径照常整页打开
+				if (!url.pathname.startsWith("/admin")) return;
+				if (
+					url.pathname === window.location.pathname &&
+					url.search === window.location.search &&
+					url.hash === window.location.hash
+				) {
+					return;
+				}
+				event.preventDefault();
+				void adminNavigate(url.href);
+			});
+
+			window.addEventListener("popstate", () => {
+				void adminNavigate(window.location.href, false);
+			});
+		</script>
+	</body>
+</html>

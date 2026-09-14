@@ -1,0 +1,20 @@
+---
+import EditorWorkspace from "../components/EditorWorkspace.svelte";
+import AdminLayout from "../layouts/AdminLayout.astro";
+import { getSession } from "../lib/auth";
+import { resolveProjectPath } from "../lib/paths";
+
+const session = getSession(Astro);
+if (!session) return Astro.redirect("/admin/login/");
+
+// ?file= 指定初始打开的文件（服务端先做路径校验）
+const fileParam = Astro.url.searchParams.get("file");
+const resolved = fileParam ? resolveProjectPath(fileParam) : null;
+const initialFile = resolved?.ok ? resolved.rel : null;
+---
+
+<AdminLayout title="文件编辑器" active="editor" session={session}>
+	<div class="h-full">
+		<EditorWorkspace client:load initialFile={initialFile} />
+	</div>
+</AdminLayout>

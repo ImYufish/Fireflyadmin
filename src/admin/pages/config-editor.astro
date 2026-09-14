@@ -1,0 +1,16 @@
+---
+import ConfigEditor from "../components/ConfigEditor.svelte";
+import AdminLayout from "../layouts/AdminLayout.astro";
+import { getSession } from "../lib/auth";
+
+const session = getSession(Astro);
+if (!session) return Astro.redirect("/admin/login/");
+
+const file = Astro.url.searchParams.get("file") ?? "";
+---
+
+<AdminLayout title="配置编辑" active="config" session={session}>
+	<div class="mx-auto max-w-4xl p-6 md:p-8">
+		<ConfigEditor filePath={file} client:load />
+	</div>
+</AdminLayout>

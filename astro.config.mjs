@@ -1,7 +1,15 @@
 import { setMaxListeners } from "node:events";
 import cloudflare from "@astrojs/cloudflare";
+import node from "@astrojs/node";
+import { loadEnvIntoProcess } from "./src/admin/lib/env-loader.mjs";
+import fireflyAdmin from "./src/admin/integration.mjs";
+
+// Astro/Vite 只把 .env 注入 import.meta.env，不会写入 process.env；
+// 后台配置全部读 process.env，故在此补一次加载（平台注入的变量优先）。
+loadEnvIntoProcess();
 import { unified } from "@astrojs/markdown-remark";
 import mdx from "@astrojs/mdx";
+import vercel from "@astrojs/vercel";
 import sitemap from "@astrojs/sitemap";
 import svelte from "@astrojs/svelte";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
@@ -9,6 +17,7 @@ import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
 import swup from "@swup/astro";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, fontProviders } from "astro/config";
+import edgeone from "@edgeone/astro";
 import expressiveCode from "astro-expressive-code";
 import icon from "astro-icon";
 import { pluginLanguageLogo } from "ec-lang-logo"; /* Language Logo */
@@ -59,11 +68,22 @@ if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
 
+/* 部署平台按环境变量自动选择 SSR adapter：
+   CF_WORKERS=true → Cloudflare Workers；VERCEL（Vercel 构建环境自带）→ Vercel；
+   EDGEONE=1（或 EO=1）→ EdgeOne Pages；EDGEONE_NODE=1 → 通用 Node 服务器
+   （dist/server/entry.mjs，可用于 EdgeOne Node Functions / 自有服务器）。
+   都不设置时为纯静态构建，后台路由不注入。 */
 const adapter = process.env.CF_WORKERS
 	? cloudflare({
 			prerenderEnvironment: "node",
 		})
-	: undefined;
+	: process.env.EDGEONE || process.env.EO
+		? edgeone()
+		: process.env.VERCEL
+			? vercel()
+			: process.env.EDGEONE_NODE
+				? node({ mode: "standalone" })
+				: undefined;
 
 // https://astro.build/config
 export default defineConfig({
@@ -117,6 +137,8 @@ export default defineConfig({
 	},
 
 	integrations: [
+		// /admin 后台管理：默认仅 dev 启用，生产需 ADMIN_ENABLE=true + SSR 部署
+		fireflyAdmin(),
 		swup({
 			theme: false,
 			animationClass: "transition-swup-", // see https://swup.js.org/options/#animationselector

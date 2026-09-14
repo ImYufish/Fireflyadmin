@@ -1,0 +1,89 @@
+---
+import PostTable from "../components/PostTable.svelte";
+import AdminLayout from "../layouts/AdminLayout.astro";
+import { getSession } from "../lib/auth";
+import { listPosts } from "../lib/posts";
+
+const session = getSession(Astro);
+if (!session) return Astro.redirect("/admin/login/");
+
+const posts = await listPosts();
+const published = posts.filter((p) => !p.draft).length;
+const drafts = posts.length - published;
+const categories = new Set(posts.map((p) => p.category.trim() || "未分类"))
+	.size;
+
+const stats = [
+	{
+		label: "全部文章",
+		value: posts.length,
+		unit: "篇",
+		color: "var(--admin-accent)",
+		icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9z",
+	},
+	{
+		label: "已发布",
+		value: published,
+		unit: "篇",
+		color: "var(--admin-success)",
+		icon: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m-2 15-5-5 1.4-1.4L10 14.2l7.6-7.6L19 8z",
+	},
+	{
+		label: "草稿",
+		value: drafts,
+		unit: "篇",
+		color: "var(--admin-warn)",
+		icon: "M18.4 2.6a2 2 0 0 1 3 3L8 19H4v-4zM6.6 15.4 16 6l2 2-9.4 9.4H6.6z",
+	},
+	{
+		label: "分类数",
+		value: categories,
+		unit: "个",
+		color: "var(--admin-info)",
+		icon: "M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z",
+	},
+];
+---
+
+<AdminLayout title="文章管理" active="posts" session={session}>
+	<div class="mx-auto max-w-6xl p-6 md:p-8">
+		<header class="mb-6">
+			<h2 class="text-2xl font-bold text-(--admin-text-strong)">文章管理</h2>
+			<p class="mt-1 text-sm text-(--admin-text-faint)">
+				点击标题进入编辑器；预览直接打开博客前台页面，渲染效果与博客完全一致。
+			</p>
+		</header>
+
+		<div class="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			{
+				stats.map((s) => (
+					<div class="flex items-center gap-3.5 rounded-2xl border border-(--admin-line) bg-(--admin-panel) px-5 py-4 transition-colors hover:border-(--admin-accent)/35">
+						<span
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+							style={`background: color-mix(in oklab, ${s.color} 14%, transparent); color: ${s.color}`}
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+								<path d={s.icon}></path>
+							</svg>
+						</span>
+						<div class="min-w-0">
+							<div class="truncate text-xs text-(--admin-text-faint)">
+								{s.label}
+							</div>
+							<div class="text-lg font-bold text-(--admin-text-strong)">
+								{s.value}
+								<span class="ml-0.5 text-xs font-medium text-(--admin-text-faint)">
+									{s.unit}
+								</span>
+							</div>
+						</div>
+					</div>
+				))
+			}
+		</div>
+
+		<div class="admin-panel p-5">
+			<PostTable client:load posts={posts} />
+		</div>
+	</div>
+</AdminLayout>

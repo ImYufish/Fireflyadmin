@@ -1,0 +1,150 @@
+---
+import FontSetup from "@components/features/FontSetup.astro";
+import LoginForm from "../components/LoginForm.svelte";
+import ThemeInit from "../components/ThemeInit.astro";
+import { adminConfig } from "../config";
+import { getSession } from "../lib/auth";
+import "../../styles/variables.styl";
+import "../styles/admin.css";
+
+// 已登录用户直接进入后台首页
+const session = getSession(Astro);
+if (session) return Astro.redirect("/admin/");
+
+const bgApi = adminConfig.loginBackgroundApi;
+const bgUrl = bgApi
+	? `${bgApi}${bgApi.includes("?") ? "&" : "?"}t=${Date.now()}`
+	: "";
+const oauthEnabled = Boolean(adminConfig.githubClientId);
+const urlError = Astro.url.searchParams.get("error");
+const callbackUrl = new URL("/api/admin/auth/callback/", Astro.url.origin).href;
+
+// OAuth 桥接票据：回调发放的一次性票据，由同站脚本换取会话 Cookie
+const bridgeTicket = Astro.url.searchParams.get("bridge");
+---
+
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>登录 · Firefly 后台</title>
+		<ThemeInit />
+		<FontSetup />
+	</head>
+	<body class="relative min-h-screen" data-no-swup>
+		{
+			bgUrl && (
+				<img
+					class="admin-login-bg"
+					src={bgUrl}
+					alt=""
+					aria-hidden="true"
+					loading="eager"
+					onerror="this.style.display='none'"
+				/>
+			)
+		}
+		<div class="admin-login-shade"></div>
+		<!-- 浮动主题切换（与博客同一存储键） -->
+		<button
+			id="login-theme-toggle"
+			type="button"
+			aria-label="切换明暗主题"
+			class="fixed top-5 right-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-(--admin-line) bg-(--card-bg-transparent) text-(--admin-text) shadow-lg backdrop-blur transition-colors hover:text-(--admin-accent-hover)"
+		>
+			<svg data-theme-icon="dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="hidden h-5 w-5"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"></path></svg>
+			<svg data-theme-icon="light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="hidden h-5 w-5"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10M2 13h2a1 1 0 1 0 0-2H2a1 1 0 1 0 0 2m18 0h2a1 1 0 1 0 0-2h-2a1 1 0 1 0 0 2M11 2v2a1 1 0 1 0 2 0V2a1 1 0 1 0-2 0m0 18v2a1 1 0 1 0 2 0v-2a1 1 0 1 0-2 0M5.99 4.58a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41zm12.37 12.37a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41zm1.06-10.96a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41zM7.05 18.36a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41z"></path></svg>
+		</button>
+		<script is:inline>
+			(function () {
+				function sync() {
+					var dark = document.documentElement.classList.contains("dark");
+					var d = document.querySelector('[data-theme-icon="dark"]');
+					var l = document.querySelector('[data-theme-icon="light"]');
+					if (d) d.style.display = dark ? "" : "none";
+					if (l) l.style.display = dark ? "none" : "";
+				}
+				sync();
+				document
+					.getElementById("login-theme-toggle")
+					?.addEventListener("click", function () {
+						var dark = document.documentElement.classList.contains("dark");
+						var next = dark ? "light" : "dark";
+						localStorage.setItem("theme", next);
+						document.documentElement.classList.toggle("dark", next === "dark");
+						sync();
+					});
+			})();
+		</script>
+		<main class="relative flex min-h-screen items-center justify-center p-4">
+			{
+				bridgeTicket ? (
+					<div class="admin-login-card admin-fade-in w-full max-w-md p-10 text-center text-(--admin-text-strong)">
+						<svg
+							class="mx-auto h-9 w-9 animate-spin text-(--admin-accent)"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z"
+							></path>
+						</svg>
+						<p class="mt-4 text-sm">GitHub 授权成功，正在建立会话…</p>
+					</div>
+				) : (
+					<LoginForm
+						client:load
+						{oauthEnabled}
+						{urlError}
+						{callbackUrl}
+						hasBackground={Boolean(bgUrl)}
+					/>
+				)
+			}
+		</main>
+	</body>
+</html>
+
+{
+	bridgeTicket && (
+		<script
+			is:inline
+			define:vars={{ bridgeTicket }}
+		>
+			(async () => {
+				const fail = (message) => {
+					window.location.href =
+						"/admin/login/?error=" + encodeURIComponent(message);
+				};
+				try {
+					const res = await fetch("/api/admin/auth/session/", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ ticket: bridgeTicket }),
+					});
+					const data = await res.json().catch(() => null);
+					if (!res.ok || !data?.ok) {
+						fail(data?.error ?? "会话建立失败（" + res.status + "）");
+						return;
+					}
+					window.location.href = "/admin/";
+				} catch {
+					fail("网络请求失败，请重试");
+				}
+			})();
+		</script>
+	)
+}

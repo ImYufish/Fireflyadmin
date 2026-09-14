@@ -1,0 +1,218 @@
+---
+import fs from "node:fs/promises";
+import path from "node:path";
+import { Icon } from "astro-icon/components";
+import AdminLayout from "../layouts/AdminLayout.astro";
+import { getSession } from "../lib/auth";
+
+const session = getSession(Astro);
+if (!session) return Astro.redirect("/admin/login/");
+
+/** 常用配置文件的中文说明 */
+const CONFIG_DESCRIPTIONS: Record<string, string> = {
+	"siteConfig.ts": "站点核心：标题、副标题、语言、URL、分页、文章页开关",
+	"profileConfig.ts": "侧边栏个人资料：头像、昵称、简介、社交链接",
+	"navBarConfig.ts": "顶部导航栏：链接、模式、搜索开关",
+	"sidebarConfig.ts": "侧边栏布局：左右侧开关与组件排序",
+	"licenseConfig.ts": "文章转载声明与许可协议",
+	"commentConfig.ts": "评论系统：Waline / Twikoo / Giscus 等",
+	"analyticsConfig.ts": "统计分析：Umami / 百度统计 / Google Analytics",
+	"expressiveCodeConfig.ts": "代码块样式、语言徽标与折叠按钮",
+	"backgroundWallpaper.ts": "壁纸与全屏沉浸模式",
+	"coverImageConfig.ts": "文章封面图显示策略",
+	"fontConfig.ts": "字体与自定义字体加载",
+	"announcementConfig.ts": "公告栏内容",
+	"dynamicConfig.ts": "说说/动态页配置",
+	"friendsConfig.ts": "友链配置",
+	"galleryConfig.ts": "相册配置",
+	"musicConfig.ts": "音乐播放器",
+	"effectsConfig.ts": "页面特效（打字效果、横幅遮挡等）",
+	"displaySettingsConfig.ts": "访客显示设置面板",
+	"sponsorConfig.ts": "赞助/打赏",
+	"booknavConfig.ts": "书架导航页",
+	"pioConfig.ts": "看板娘（Live2D / Spine）",
+	"mermaidConfig.ts": "Mermaid 图表配置",
+	"plantumlConfig.ts": "PlantUML 服务端地址",
+	"FooterConfig.html": "页脚自定义 HTML",
+	"README.md": "配置目录说明文档",
+};
+
+/** 最常用的配置，永远排在表格最上面 */
+const PINNED = [
+	"siteConfig.ts",
+	"profileConfig.ts",
+	"navBarConfig.ts",
+	"sidebarConfig.ts",
+	"commentConfig.ts",
+	"analyticsConfig.ts",
+];
+
+function tierOf(name: string): number {
+	return PINNED.includes(name) ? 0 : CONFIG_DESCRIPTIONS[name] ? 1 : 2;
+}
+
+const configDir = path.resolve(process.cwd(), "src/config");
+const entries = (await fs.readdir(configDir, { withFileTypes: true })).filter(
+	(entry) =>
+		entry.isFile() &&
+		!entry.name.startsWith(".") &&
+		/\.(ts|html|md)$/i.test(entry.name),
+);
+
+const files = (
+	await Promise.all(
+		entries.map(async (entry) => {
+			const stat = await fs.stat(path.join(configDir, entry.name));
+			return {
+				name: entry.name,
+				size: stat.size,
+				mtime: stat.mtime,
+			};
+		}),
+	)
+).sort((a, b) => {
+	const t = tierOf(a.name) - tierOf(b.name);
+	return t || a.name.localeCompare(b.name, "zh-Hans-CN", { numeric: true });
+});
+
+function fmtSize(n: number): string {
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function fmtDate(d: Date): string {
+	return d.toLocaleDateString("zh-CN", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	});
+}
+---
+
+<AdminLayout title="网站配置" active="config" session={session}>
+	<div class="mx-auto max-w-6xl p-6 md:p-8">
+		<header class="mb-6">
+			<h1 class="text-2xl font-bold text-(--admin-text-strong)">网站配置</h1>
+			<p class="mt-1 text-sm text-(--admin-text-faint)">
+				共 {files.length} 个配置文件，常用配置排在最前。点击任意一行进入编辑器修改，
+				保存后开发服务器自动热更新。
+			</p>
+		</header>
+
+		<div class="mb-5 flex flex-wrap items-center gap-3">
+			<div class="relative min-w-64 flex-1">
+				<svg viewBox="0 0 24 24" fill="currentColor" class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-(--admin-text-faint)"><path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"></path></svg>
+				<input
+					id="config-search"
+					type="search"
+					placeholder="搜索文件名或说明，如：评论、sidebar…"
+					class="admin-input !pl-9"
+					autocomplete="off"
+				/>
+			</div>
+			<span class="text-xs text-(--admin-text-faint)" id="config-count"
+				>共 {files.length} 个</span
+			>
+		</div>
+
+		<div class="admin-panel overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="w-full min-w-[640px] text-left text-sm">
+					<thead>
+						<tr class="border-b border-(--admin-line) text-xs text-(--admin-text-faint)">
+							<th class="px-5 py-3 font-medium">配置文件</th>
+							<th class="px-4 py-3 font-medium">说明</th>
+							<th class="px-4 py-3 font-medium">大小</th>
+							<th class="px-4 py-3 font-medium">修改时间</th>
+							<th class="px-4 py-3"></th>
+						</tr>
+					</thead>
+					<tbody>
+						{
+							files.map((file) => {
+								const tier = tierOf(file.name);
+								const href = `/admin/config-editor/?file=${encodeURIComponent(`src/config/${file.name}`)}`;
+								const filterKey = `${file.name} ${CONFIG_DESCRIPTIONS[file.name] ?? ""}`.toLowerCase();
+								return (
+									<tr
+										class="group border-b border-(--admin-divider) transition-colors last:border-0 hover:bg-(--admin-panel-hover)"
+										data-filter={filterKey}
+									>
+										<td class="px-5 py-3">
+											<a href={href} class="flex items-center gap-3">
+												<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--admin-accent)/10 text-(--admin-accent-hover)">
+													<Icon
+														name={file.name.endsWith(".html") ? "material-symbols:code" : "material-symbols:tune"}
+														class="text-base"
+													/>
+												</span>
+												<span class="font-mono text-[13px] font-medium text-(--admin-text-strong) group-hover:text-(--admin-accent-hover)">
+													{file.name}
+												</span>
+											</a>
+										</td>
+										<td class="max-w-md px-4 py-3 text-xs leading-relaxed text-(--admin-text)">
+											{CONFIG_DESCRIPTIONS[file.name] ?? "点击用编辑器打开修改"}
+										</td>
+										<td class="px-4 py-3 font-mono text-xs text-(--admin-text-faint)">
+											{fmtSize(file.size)}
+										</td>
+										<td class="px-4 py-3 font-mono text-xs text-(--admin-text-faint)">
+											{fmtDate(file.mtime)}
+										</td>
+										<td class="px-4 py-3 text-right">
+											{tier === 0 ? (
+												<span class="admin-badge-info rounded-full px-2 py-0.5 text-[10px]">常用</span>
+											) : tier === 2 ? (
+												<span class="rounded-full bg-(--admin-soft) px-2 py-0.5 text-[10px] text-(--admin-text-faint)">其他</span>
+											) : null}
+										</td>
+									</tr>
+								);
+							})
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<p id="config-empty" class="hidden py-10 text-center text-sm text-(--admin-text-faint)">
+			没有匹配的配置文件
+		</p>
+
+		<div class="admin-panel mt-6 p-5 text-sm leading-relaxed text-(--admin-text)">
+			<h2 class="mb-2 flex items-center gap-2 font-semibold text-(--admin-text-strong)">
+				<Icon name="material-symbols:info-outline" class="text-(--admin-accent-hover)" />
+				修改配置的注意事项
+			</h2>
+			<ul class="list-inside list-disc space-y-1.5 text-xs">
+				<li>
+					配置文件是 TypeScript 源码，请保持变量名、引号与结构不变，只修改值；
+					编辑器有 TS 语法高亮辅助。
+				</li>
+				<li>保存后开发服务器会自动热更新，直接刷新博客页面即可看到效果。</li>
+				<li>改错配置会导致页面报错，可随时在编辑器里改回，或用 Git 还原。</li>
+				<li>部分配置（如字体、壁纸）同时影响首页与文章页，建议两边都预览确认。</li>
+			</ul>
+		</div>
+	</div>
+</AdminLayout>
+
+<script>
+	/* 配置文件实时过滤（文件名 + 中文说明） */
+	const input = document.getElementById("config-search") as HTMLInputElement | null;
+	const rows = document.querySelectorAll<HTMLTableRowElement>("tr[data-filter]");
+	const empty = document.getElementById("config-empty");
+	const count = document.getElementById("config-count");
+	input?.addEventListener("input", () => {
+		const kw = input.value.trim().toLowerCase();
+		let visible = 0;
+		for (const row of rows) {
+			const hit = !kw || (row.dataset.filter ?? "").includes(kw);
+			row.style.display = hit ? "" : "none";
+			if (hit) visible++;
+		}
+		empty?.classList.toggle("hidden", visible > 0);
+		if (count) count.textContent = kw ? `匹配 ${visible} 个` : `共 ${rows.length} 个`;
+	});
+</script>

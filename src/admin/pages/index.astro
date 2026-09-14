@@ -1,0 +1,89 @@
+---
+import { siteConfig } from "@/config";
+import Dashboard from "../components/Dashboard.svelte";
+import Greeting from "../components/Greeting.svelte";
+import AdminLayout from "../layouts/AdminLayout.astro";
+import { getSession } from "../lib/auth";
+
+const session = getSession(Astro);
+if (!session) return Astro.redirect("/admin/login/");
+---
+
+<AdminLayout title="仪表盘" active="dashboard" session={session}>
+	<div class="mx-auto max-w-6xl p-6 md:p-8">
+		<header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+			<div>
+				<Greeting name={session.name} client:load />
+				<p class="mt-1 text-sm text-(--admin-text)">
+					{siteConfig.description || "今天也是分享知识的好时光。"}
+				</p>
+			</div>
+		</header>
+
+		<!-- 快捷操作 -->
+		<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+			{
+				[
+					{
+						href: "/admin/editor/",
+						icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9z",
+						label: "写文章",
+						hint: "打开编辑器",
+					},
+					{
+						href: "/admin/images/",
+						icon: "M21 5H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-5 3.5A1.5 1.5 0 1 1 14.5 10 1.5 1.5 0 0 1 16 8.5M5 16l4.5-6 3 4 2-2.5L19 16z",
+						label: "传图片",
+						hint: "图片管理",
+					},
+					{
+						href: "/admin/config/",
+						icon: "M12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5m7.4-2.5a7.8 7.8 0 0 0-.1-1l2.1-1.6a.5.5 0 0 0 .1-.7l-2-3.4a.5.5 0 0 0-.6-.2l-2.5 1a7.7 7.7 0 0 0-1.7-1L14.4 3.4a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4L9 5.9a7.7 7.7 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.4a.5.5 0 0 0 .1.7L4.6 12a7.8 7.8 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.7 7.7 0 0 0 1.7 1l.4 2.6a.5.5 0 0 0 .5.4h4a.5.5 0 0 0 .5-.4l.4-2.6a7.7 7.7 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 0 0-.1-.7L19.4 14a7.8 7.8 0 0 0 .1-1",
+						label: "改配置",
+						hint: "网站配置",
+					},
+					{
+						href: "/",
+						icon: "M14 3v2h3.6l-9.1 9.1 1.4 1.4L19 6.4V10h2V3zM5 5h6v2H7v10h10v-4h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2",
+						label: "看博客",
+						hint: "访问前台",
+						external: true,
+					},
+				].map((action) => (
+					<a
+						href={action.href}
+						target={action.external ? "_blank" : undefined}
+						class="group flex items-center gap-3 rounded-2xl border border-(--admin-line) bg-(--admin-panel) px-4 py-3.5 transition-all hover:-translate-y-0.5 hover:border-(--admin-accent)/45 hover:shadow-lg"
+					>
+						<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-(--admin-accent-soft) text-(--admin-accent-hover) transition-transform group-hover:scale-110">
+							<svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+								<path d={action.icon}></path>
+							</svg>
+						</span>
+						<span class="min-w-0">
+							<span class="block text-sm font-semibold text-(--admin-text-strong)">{action.label}</span>
+							<span class="block text-[11px] text-(--admin-text-faint)">{action.hint}</span>
+						</span>
+					</a>
+				))
+			}
+		</div>
+
+		<Dashboard client:load />
+	</div>
+</AdminLayout>
+
+<style>
+	@keyframes wave {
+		0%,
+		100% {
+			transform: rotate(0deg);
+		}
+		25% {
+			transform: rotate(14deg);
+		}
+		75% {
+			transform: rotate(-6deg);
+		}
+	}
+</style>

@@ -1,0 +1,613 @@
+/* Firefly 后台管理样式：颜色全部引用博客主题变量（src/styles/variables.styl），
+   主题色 hue 与明暗模式与博客前台实时一致（在 siteConfig 里改颜色后台跟着变） */
+@import "tailwindcss";
+
+/* 暗色变体：与博客一致（.dark 类挂在 html 上） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 语义变量：映射博客主题变量，供后台组件使用 */
+:root {
+	--admin-bg: var(--page-bg);
+	--admin-panel: var(--card-bg);
+	--admin-panel-hover: var(--btn-plain-bg-hover);
+	--admin-panel-active: var(--btn-plain-bg-active);
+	--admin-soft: var(--btn-regular-bg);
+	--admin-soft-hover: var(--btn-regular-bg-hover);
+	--admin-line: var(--line-color);
+	--admin-divider: var(--line-divider);
+	--admin-text-strong: var(--deep-text);
+	--admin-text: var(--content-meta);
+	--admin-text-faint: var(--meta-divider);
+	--admin-accent: var(--primary);
+	--admin-accent-hover: var(--title-active);
+	--admin-accent-soft: color-mix(in oklab, var(--primary) 15%, transparent);
+	--admin-warn: var(--admonitions-color-warning);
+	--admin-danger: var(--admonitions-color-caution);
+	--admin-info: var(--admonitions-color-note);
+	--admin-success: var(--admonitions-color-tip);
+}
+
+/* 暗色模式：博客未在暗色下重定义 --deep-text（仍是深色），这里给出可读的强文字色 */
+:root.dark {
+	--admin-text-strong: oklch(0.93 0.015 var(--hue));
+	--admin-text-faint: rgb(255 255 255 / 0.45);
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	font-family:
+		"Roboto",
+		ui-sans-serif,
+		system-ui,
+		-apple-system,
+		"Segoe UI",
+		"PingFang SC",
+		"Microsoft YaHei",
+		sans-serif;
+	background-color: var(--admin-bg);
+	color: var(--admin-text-strong);
+	-webkit-font-smoothing: antialiased;
+}
+
+/* 细滚动条（跟随主题色） */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in oklab, var(--admin-accent) 35%, transparent)
+		transparent;
+}
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+	background: color-mix(in oklab, var(--admin-accent) 30%, transparent);
+	border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+	background: color-mix(in oklab, var(--admin-accent) 50%, transparent);
+}
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+/* 文本选区与键盘焦点环跟随主题色 */
+::selection {
+	background: color-mix(in oklab, var(--admin-accent) 30%, transparent);
+}
+:focus-visible {
+	outline: 2px solid color-mix(in oklab, var(--admin-accent) 60%, transparent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* 侧栏导航项：激活态统一由此驱动（指示条 + 主题色） */
+.admin-nav-item {
+	position: relative;
+}
+.admin-nav-item.is-active {
+	background-color: var(--admin-accent-soft);
+	color: var(--admin-accent-hover);
+	font-weight: 500;
+}
+.admin-nav-item.is-active::before {
+	content: "";
+	position: absolute;
+	left: -0.75rem;
+	top: 20%;
+	bottom: 20%;
+	width: 3px;
+	border-radius: 9999px;
+	background: var(--admin-accent);
+}
+
+/* 通用面板卡片 */
+.admin-panel {
+	border-radius: 1rem;
+	border: 1px solid var(--admin-line);
+	background: var(--admin-panel);
+}
+
+/* 图片灯箱 */
+.admin-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	background: rgb(0 0 0 / 78%);
+	backdrop-filter: blur(6px);
+	padding: 24px;
+	animation: admin-fade-in 0.18s ease-out;
+}
+.admin-lightbox img {
+	max-width: min(1100px, 92vw);
+	max-height: 78vh;
+	border-radius: 12px;
+	box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.8);
+}
+.admin-lightbox-meta {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	max-width: 92vw;
+	color: rgb(255 255 255 / 0.92);
+	font-size: 12px;
+}
+.admin-lightbox-meta .name {
+	max-width: 46vw;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.admin-lightbox-meta button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	border-radius: 8px;
+	background: rgb(255 255 255 / 0.14);
+	padding: 5px 11px;
+	font-size: 12px;
+	color: #fff;
+	transition: background 0.15s ease;
+}
+.admin-lightbox-meta button:hover {
+	background: rgb(255 255 255 / 0.26);
+}
+
+/* CodeMirror 容器自适应 */
+.admin-codemirror {
+	height: 100%;
+	overflow: hidden;
+}
+.admin-codemirror .cm-editor {
+	height: 100%;
+	background: transparent;
+}
+.admin-codemirror .cm-editor.cm-focused {
+	outline: none;
+}
+.admin-codemirror .cm-scroller {
+	font-family:
+		ui-monospace,
+		SFMono-Regular,
+		Menlo,
+		Consolas,
+		"Liberation Mono",
+		monospace;
+	line-height: 1.6;
+}
+
+/* 表单控件 */
+.admin-input {
+	width: 100%;
+	border-radius: 0.5rem;
+	border: 1px solid var(--admin-line);
+	background-color: var(--admin-bg);
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	color: var(--admin-text-strong);
+	outline: none;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+.admin-input:focus {
+	border-color: var(--admin-accent);
+	box-shadow: 0 0 0 2px var(--admin-accent-soft);
+}
+.admin-input::placeholder {
+	color: var(--admin-text-faint);
+}
+
+.admin-label {
+	display: block;
+	margin-bottom: 0.375rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	color: var(--admin-text);
+}
+
+/* 按钮 */
+.admin-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+	border-radius: 0.5rem;
+	padding: 0.5rem 0.875rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	white-space: nowrap;
+	transition: all 0.15s ease;
+	cursor: pointer;
+	user-select: none;
+}
+.admin-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.admin-btn-primary {
+	background-color: var(--admin-accent);
+	color: var(--page-bg);
+}
+.admin-btn-primary:hover:not(:disabled) {
+	background-color: var(--admin-accent-hover);
+}
+.admin-btn-ghost {
+	border: 1px solid var(--admin-line);
+	color: var(--admin-text-strong);
+	background-color: transparent;
+}
+.admin-btn-ghost:hover:not(:disabled) {
+	background-color: var(--admin-panel-hover);
+	border-color: var(--admin-text-faint);
+}
+.admin-btn-danger {
+	border: 1px solid color-mix(in oklab, var(--admin-danger) 50%, transparent);
+	color: var(--admin-danger);
+	background-color: transparent;
+}
+.admin-btn-danger:hover:not(:disabled) {
+	background-color: color-mix(in oklab, var(--admin-danger) 15%, transparent);
+}
+
+/* 语义提示块与徽标（跟随博客 admonition 配色） */
+.admin-alert {
+	border-radius: 0.75rem;
+	border: 1px solid;
+	padding: 0.75rem 0.875rem;
+	font-size: 0.875rem;
+}
+.admin-alert-danger {
+	border-color: color-mix(in oklab, var(--admin-danger) 45%, transparent);
+	background-color: color-mix(in oklab, var(--admin-danger) 12%, transparent);
+	color: var(--admin-danger);
+}
+.admin-alert-warn {
+	border-color: color-mix(in oklab, var(--admin-warn) 45%, transparent);
+	background-color: color-mix(in oklab, var(--admin-warn) 10%, transparent);
+	color: var(--admin-warn);
+}
+.admin-alert-warn-soft {
+	border-color: color-mix(in oklab, var(--admin-warn) 30%, transparent);
+	background-color: color-mix(in oklab, var(--admin-warn) 6%, transparent);
+	color: var(--admin-warn);
+}
+.admin-badge-warn {
+	background-color: color-mix(in oklab, var(--admin-warn) 18%, transparent);
+	color: var(--admin-warn);
+}
+.admin-badge-danger {
+	background-color: color-mix(in oklab, var(--admin-danger) 18%, transparent);
+	color: var(--admin-danger);
+}
+.admin-badge-info {
+	background-color: color-mix(in oklab, var(--admin-info) 18%, transparent);
+	color: var(--admin-info);
+}
+.text-admin-warn {
+	color: var(--admin-warn);
+}
+.text-admin-danger {
+	color: var(--admin-danger);
+}
+
+/* 登录页背景 */
+.admin-login-bg {
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	z-index: -2;
+	filter: saturate(1.05);
+}
+.admin-login-shade {
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	background:
+		linear-gradient(
+			to bottom,
+			color-mix(in oklab, var(--page-bg) 55%, transparent),
+			color-mix(in oklab, var(--page-bg) 75%, transparent)
+		);
+	backdrop-filter: blur(2px);
+}
+.admin-login-card {
+	background: var(--card-bg-transparent);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid var(--admin-line);
+	border-radius: var(--radius-large);
+	box-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.45);
+	animation: login-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes login-rise {
+	from {
+		opacity: 0;
+		transform: translateY(18px) scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+/* 主按钮悬浮抬升 + 主题色投影 */
+.admin-btn-lift {
+	box-shadow: 0 8px 20px -8px color-mix(in oklab, var(--admin-accent) 55%, transparent);
+}
+.admin-btn-lift:hover:not(:disabled) {
+	transform: translateY(-1px);
+	box-shadow: 0 12px 26px -10px color-mix(in oklab, var(--admin-accent) 65%, transparent);
+}
+.admin-btn-lift:active:not(:disabled) {
+	transform: translateY(0);
+}
+
+/* 过渡动画 */
+@keyframes admin-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+.admin-fade-in {
+	animation: admin-fade-in 0.25s ease-out;
+}
+
+/* 无刷新导航的内容过渡（对齐博客 swup 的体感） */
+#admin-main {
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s ease;
+}
+#admin-main.admin-nav-out {
+	opacity: 0;
+	transform: translateY(6px);
+}
+#admin-main.admin-nav-in {
+	animation: admin-fade-in 0.25s ease-out;
+}
+
+/* 资料卡：折叠/展开瞬间 padding 与头像尺寸会跳变，视觉上像「弹一下」。
+   让它们跟随侧栏宽度一起过渡，展开/收起就平滑了。 */
+.sidebar-profile {
+	transition:
+		padding 0.2s ease,
+		border-color 0.2s ease,
+		background 0.2s ease;
+}
+.sidebar-profile-avatar {
+	transition:
+		width 0.2s ease,
+		height 0.2s ease;
+}
+
+/* 侧边栏折叠时资料卡精简为纯头像（无边框、无背景、不突出） */
+#admin-sidebar.collapsed .sidebar-profile {
+	border-color: transparent;
+	background: transparent;
+	padding: 6px 0 2px;
+}
+#admin-sidebar.collapsed .sidebar-profile-avatar {
+	height: 38px;
+	width: 38px;
+	margin: 0 auto;
+	font-size: 14px;
+	transition:
+		width 0.2s ease,
+		height 0.2s ease,
+		transform 0.15s ease,
+		box-shadow 0.15s ease;
+}
+#admin-sidebar.collapsed .sidebar-profile-avatar:hover {
+	transform: scale(1.08);
+	box-shadow: 0 0 0 3px color-mix(in oklab, var(--admin-accent) 30%, transparent);
+}
+#admin-sidebar.collapsed .sidebar-profile-link {
+	display: none;
+}
+
+/* ============================================================
+   统一弹窗
+   插入参数弹窗、文件操作弹窗、删除确认共用一套外观与交互：
+   遮罩 + 居中面板，标题 / 内容 / 页脚三段式，Esc 关闭、打开即聚焦。
+   之前各组件自己写遮罩透明度、圆角、字号都不一致，这里收敛到一处。
+   ============================================================ */
+.admin-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 90;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+	background: rgb(0 0 0 / 0.55);
+	backdrop-filter: blur(2px);
+	animation: admin-modal-fade 0.16s ease-out;
+}
+
+.admin-modal-panel {
+	display: flex;
+	width: 100%;
+	max-width: 26rem;
+	max-height: calc(100vh - 2rem);
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--admin-line);
+	border-radius: 1rem;
+	background: var(--admin-panel);
+	box-shadow: 0 24px 60px rgb(0 0 0 / 0.32);
+	animation: admin-modal-in 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.admin-modal-head {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 1.1rem 1.25rem 0.85rem;
+}
+
+.admin-modal-title {
+	flex: 1;
+	min-width: 0;
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--admin-text-strong);
+}
+
+.admin-modal-close {
+	display: flex;
+	width: 1.75rem;
+	height: 1.75rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.5rem;
+	color: var(--admin-text-faint);
+	transition:
+		background 0.15s,
+		color 0.15s;
+}
+
+.admin-modal-close:hover {
+	background: var(--admin-panel-hover);
+	color: var(--admin-text-strong);
+}
+
+.admin-modal-body {
+	min-height: 0;
+	flex: 1;
+	overflow-y: auto;
+	padding: 0 1.25rem 1.25rem;
+	font-size: 0.8125rem;
+	line-height: 1.65;
+	color: var(--admin-text);
+}
+
+.admin-modal-body code {
+	border-radius: 0.25rem;
+	background: var(--admin-soft);
+	padding: 0.1rem 0.35rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.75rem;
+	color: var(--admin-text-strong);
+}
+
+.admin-modal-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+	border-top: 1px solid var(--admin-divider);
+	background: var(--admin-bg);
+	padding: 0.875rem 1.25rem;
+}
+
+@keyframes admin-modal-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes admin-modal-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ============================================================
+   窄屏（< 768px）：侧栏由固定栏改为抽屉
+   桌面端侧栏是常驻的一列；窄屏若保持常驻会吃掉大半屏宽，
+   故改为覆盖式抽屉，由顶栏的汉堡按钮控制，点击遮罩或导航后自动关闭。
+   ============================================================ */
+.admin-sidebar-backdrop {
+	display: none;
+}
+
+@media (max-width: 767px) {
+	#admin-sidebar {
+		position: fixed;
+		inset: 0 auto 0 0;
+		z-index: 60;
+		/* 覆盖桌面端由 JS 切换的 w-16 / w-60 */
+		width: 15rem !important;
+		transform: translateX(-100%);
+		transition: transform 0.22s ease;
+	}
+
+	#admin-sidebar.is-open {
+		transform: translateX(0);
+		box-shadow: 0 12px 44px rgb(0 0 0 / 0.22);
+	}
+
+	/* 抽屉内始终显示完整文字，忽略桌面端的折叠偏好
+	   （JS 会写 inline style，故需要 !important 覆盖） */
+	#admin-sidebar .sidebar-label,
+	#admin-sidebar .sidebar-profile-link {
+		display: block !important;
+	}
+
+	#admin-sidebar .admin-nav-item,
+	#admin-sidebar > div:first-child {
+		justify-content: flex-start !important;
+	}
+
+	/* 折叠态的资料卡精简样式在抽屉里不适用 */
+	#admin-sidebar .sidebar-profile {
+		border-color: var(--admin-line);
+		background: var(--admin-bg);
+		padding: 1rem;
+	}
+
+	#admin-sidebar .sidebar-profile-avatar {
+		height: 3rem;
+		width: 3rem;
+		font-size: 1.125rem;
+	}
+
+	/* 收起菜单按钮仅桌面端有意义，抽屉模式下由汉堡按钮接管 */
+	#admin-sidebar-toggle {
+		display: none;
+	}
+
+	.admin-sidebar-backdrop {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 55;
+		background: rgb(0 0 0 / 0.4);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.22s ease;
+	}
+
+	body.admin-sidebar-open .admin-sidebar-backdrop {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* 窄屏下正文留白收紧，避免内容被挤成窄条 */
+	#admin-main > div {
+		padding: 1.25rem 1rem;
+	}
+}

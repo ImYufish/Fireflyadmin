@@ -1,0 +1,31 @@
+---
+/**
+ * 后台主题初始化：与博客 Layout.astro 保持一致的明暗模式与主题色逻辑。
+ * 读取同样的 localStorage 键（theme / hue），后台与前台永远同步。
+ * 必须放在 <head> 内且为内联执行，避免闪烁。
+ */
+import { siteConfig } from "@/config";
+---
+
+<script
+	is:inline
+	define:vars={{
+		configHue: siteConfig.themeColor.hue,
+		defaultMode: siteConfig.themeColor.defaultMode ?? "light",
+	}}
+>
+	const theme = localStorage.getItem("theme") || defaultMode;
+	const resolved =
+		theme === "system"
+			? window.matchMedia("(prefers-color-scheme: dark)").matches
+				? "dark"
+				: "light"
+			: theme;
+	if (resolved === "dark") {
+		document.documentElement.classList.add("dark");
+	} else {
+		document.documentElement.classList.remove("dark");
+	}
+	const hue = localStorage.getItem("hue") || configHue;
+	document.documentElement.style.setProperty("--hue", hue);
+</script>
