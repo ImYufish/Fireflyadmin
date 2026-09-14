@@ -75,6 +75,9 @@ if (process.env.NODE_ENV === "development") {
    都不设置时为纯静态构建，后台路由不注入。 */
 const adapter = process.env.CF_WORKERS
 	? cloudflare({
+			// compile 模式用 Wrangler 内置图片编译，不依赖 Cloudflare Images 订阅
+			// （未开通 Images 时，声明 IMAGES 绑定会让 Worker 起不来）
+			imageService: "compile",
 			prerenderEnvironment: "node",
 		})
 	: process.env.EDGEONE || process.env.EO

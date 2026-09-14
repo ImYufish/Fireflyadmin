@@ -12,9 +12,5 @@
 	// 后台登录会话存储（Astro Sessions API 自动使用；部署时自动 provision）
 	"kv_namespaces": [
 		{ "binding": "SESSION" }
-	],
-	// 图片处理绑定（@astrojs/cloudflare 默认 imageService 使用）
-	"images": {
-		"binding": "IMAGES"
-	}
+	]
 }
