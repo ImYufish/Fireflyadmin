@@ -2,7 +2,7 @@
 	// Firefly 后台（/admin）是 SSR 路由，必须用 Cloudflare adapter 的产物部署。
 	// 构建命令需带 CF_WORKERS=true ADMIN_ENABLE=true（见 package.json 的 build:cf）。
 	"name": "fireflyadmin",
-	"main": "./dist/server/entry.mjs",
+	"main": "@astrojs/cloudflare/entrypoints/server",
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
