@@ -1,8 +1,20 @@
 {
+	// Firefly 后台（/admin）是 SSR 路由，必须用 Cloudflare adapter 的产物部署。
+	// 构建命令需带 CF_WORKERS=true ADMIN_ENABLE=true（见 package.json 的 build:cf）。
 	"name": "fireflyadmin",
+	"main": "./dist/server/entry.mjs",
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
-		"directory": "./dist"
+		"directory": "./dist/client",
+		"binding": "ASSETS"
+	},
+	// 后台登录会话存储（Astro Sessions API 自动使用；部署时自动 provision）
+	"kv_namespaces": [
+		{ "binding": "SESSION" }
+	],
+	// 图片处理绑定（@astrojs/cloudflare 默认 imageService 使用）
+	"images": {
+		"binding": "IMAGES"
 	}
 }
