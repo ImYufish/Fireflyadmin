@@ -17,8 +17,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { APIContext } from "astro";
-import type * as undiciTypes from "undici";
-import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
+// ⚠️ 不要在此静态 import undici：它依赖 node:net/TCP，在 Cloudflare Workers
+// （workerd）上加载会失败，会让 /admin 直接 500。
+// 仅当配置了代理时才按需加载（见 loadUndici）；无代理时走运行时原生 fetch。
 import { adminConfig, resolveAllowedUsers } from "../config";
 
 export const SESSION_COOKIE = "firefly_admin_session";
@@ -220,12 +221,38 @@ export function recordLoginFailure(ip: string): void {
 /* ------------------------- GitHub 网络访问（支持代理） ------------------------- */
 
 /**
- * 必须使用 npm undici 自带的 fetch（而非 Node 内置 fetch）：
+ * 代理模式下必须使用 npm undici 自带的 fetch（而非 Node 内置 fetch）：
  * 两份 undici 的 Dispatcher 接口不兼容，内置 fetch 收到 npm undici 的
  * ProxyAgent 会抛 "invalid onRequestStart method"。
+ * 无代理时直接用运行时原生 fetch，不加载 undici（Workers 上 undici 会炸）。
  */
-let strictAgent: Agent | ProxyAgent | null | undefined;
-let lenientAgent: Agent | ProxyAgent | null | undefined;
+type UndiciLike = {
+	fetch: (url: string, init: Record<string, unknown>) => Promise<unknown>;
+	Agent: new (opts: Record<string, unknown>) => unknown;
+	ProxyAgent: new (opts: Record<string, unknown> | string) => unknown;
+};
+
+let strictAgent: unknown = undefined;
+let lenientAgent: unknown = undefined;
+let undiciModule: UndiciLike | undefined;
+
+/**
+ * 按需加载 undici（仅代理场景需要）。
+ * 用 new Function 包一层 import，避免打包器静态分析并把 undici 打进产物——
+ * 一旦被打进 Workers 产物，加载即失败。Workers 无 TCP，本函数不会被调用。
+ */
+async function loadUndici(): Promise<UndiciLike> {
+	let mod = undiciModule;
+	if (!mod) {
+		const dynamicImport = new Function(
+			"m",
+			"return import(m)",
+		) as (m: string) => Promise<UndiciLike>;
+		mod = await dynamicImport("undici");
+		undiciModule = mod;
+	}
+	return mod;
+}
 
 const TLS_RETRYABLE_CODES = new Set([
 	"UNABLE_TO_VERIFY_LEAF_SIGNATURE",
@@ -253,20 +280,18 @@ export function githubProxyConfigured(): boolean {
 	return resolveProxyUrl() !== "";
 }
 
-type Dispatcher = Agent | ProxyAgent;
-
-function getAgents(): { strict: Dispatcher | null; lenient: Dispatcher } {
+function getAgents(undici: UndiciLike): { strict: unknown; lenient: unknown } {
 	const proxy = resolveProxyUrl();
 	if (strictAgent === undefined) {
-		strictAgent = proxy ? new ProxyAgent(proxy) : null;
+		strictAgent = proxy ? new undici.ProxyAgent(proxy) : null;
 		lenientAgent = proxy
-			? new ProxyAgent({
+			? new undici.ProxyAgent({
 					uri: proxy,
 					requestTls: { rejectUnauthorized: false },
 				})
-			: new Agent({ connect: { rejectUnauthorized: false } });
+			: new undici.Agent({ connect: { rejectUnauthorized: false } });
 	}
-	return { strict: strictAgent, lenient: lenientAgent as Dispatcher };
+	return { strict: strictAgent, lenient: lenientAgent };
 }
 
 function isTlsVerificationError(error: unknown): boolean {
@@ -287,13 +312,21 @@ export async function githubFetch(
 ): Promise<Response> {
 	const headers = new Headers(init.headers);
 	headers.set("User-Agent", "Firefly-Admin");
-	const { strict, lenient } = getAgents();
 	const signal = init.signal ?? AbortSignal.timeout(15_000);
-	const doFetch = (dispatcher: Dispatcher | null) =>
-		undiciFetch(url, {
+
+	// 无代理：直接用运行时原生 fetch（Workers 原生 fetch / Node 18+ fetch）。
+	// 绝不加载 undici —— 它在 workerd 上会加载失败，导致 /admin 500。
+	if (!githubProxyConfigured()) {
+		return fetch(url, { ...init, headers, signal });
+	}
+
+	const undici = await loadUndici();
+	const { strict, lenient } = getAgents(undici);
+	const doFetch = (dispatcher: unknown) =>
+		undici.fetch(url, {
 			method: init.method,
 			headers: Object.fromEntries(headers.entries()),
-			body: (init.body as undiciTypes.BodyInit | undefined) ?? undefined,
+			body: (init.body as BodyInit | undefined) ?? undefined,
 			signal,
 			...(dispatcher ? { dispatcher } : {}),
 		}) as unknown as Promise<Response>;

@@ -3,7 +3,9 @@
 	// 构建命令需带 CF_WORKERS=true ADMIN_ENABLE=true（见 package.json 的 build:cf）。
 	"name": "fireflyadmin",
 	"main": "@astrojs/cloudflare/entrypoints/server",
-	"compatibility_date": "2025-01-01",
+	// 2026-08-04 起 Workers 默认启用 nodejs_compat + nodejs_compat_v2。
+	// 旧日期（2025-01-01）下许多 Node 模块缺失（undici 依赖的 node:net 等），SSR 会 500
+	"compatibility_date": "2026-08-04",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
 		"directory": "./dist/client",
